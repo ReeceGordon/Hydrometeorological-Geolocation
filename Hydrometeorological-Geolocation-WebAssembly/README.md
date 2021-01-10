@@ -1,0 +1,1 @@
+●	Hydrometeorological conditions were tracked for a provided geographical location and presented in a visually pleasing format using .Net Blazor WebAssembly with an MVC approach.

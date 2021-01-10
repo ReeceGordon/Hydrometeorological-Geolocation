@@ -1,7 +1,865 @@
 ﻿@page "/"
+@using Hydrometeorological_Geolocation_Prototype_V2.Shared
+@using System.Net.Http.Headers;
+@using Hydrometeorological_Geolocation_Prototype_V2.Client.AuthenticationStateProviders
+@inject HttpClient Http
+@inject TokenAuthenticationStateProvider TokenProvider
+@attribute [Authorize]
 
-<h1>Hello, world!</h1>
+@using System.Text
 
-Welcome to your new app.
+<div class="container">
+    <div class="row">
+        <div class="col-xs-12 col-sm-12"><h1 class="display-2" style="text-align: center">Weather Forecast & Marine Data</h1></div>
+    </div>
+    <div class="row">
+        <div class="col-xs-12 col-sm-3"><h4 class="text-right">Enter UK City name: </h4></div>
+        <div class="col-xs-12 col-sm-6"><input class="form-control" placeholder="city name...." @bind="location" /></div>
+        <div class="col-xs-12 col-sm-3"><button class="btn btn-primary" @onclick="CitySearch">Today's Forecast</button><p></p></div>
+    </div>
+    @if (CitySearchClicked)
+    {
 
-<SurveyPrompt Title="How is Blazor working for you?" />
+        <div class="row border border-secondary">
+            <div class="col-xs-12 col-sm-6">
+                <h3 class="text-center">Weather Data</h3>
+                <p class="lead text-center">@JObjects.Location</p>
+                <p class="lead text-center">Date: @JObjects.Date.ToString("dd/MM/yyyy")</p>
+                <p class="lead text-center">Time: @JObjects.ObservedTime</p>
+                <p class="lead text-center">Temperature: @JObjects.TempC °</p>
+                <p class="lead text-center">Real Feel: @JObjects.RealFeel °</p>
+                <p class="lead text-center">Humidity: @JObjects.Humidity</p>
+                <p class="lead text-center">Description: @JObjects.WeatherDescription</p>
+                <p class="lead text-center">Windspeed KMPH: @JObjects.WindSpeedKMPH</p>
+                <p class="lead text-center">Wind Direction: @JObjects.WindDirection</p>
+            </div>
+
+
+            <div class="col-xs-12 col-sm-6">
+                <div class="row">
+                    <div class="col-xs-12 col-sm-12">
+                        <h3 class="text-center">Marine Data</h3>
+                        @if (string.IsNullOrWhiteSpace(JObjects.NearestCity))
+                        {
+                            <p class="lead text-center">NA, no near city found</p>
+                        }
+                        else
+                        {
+                            <p class="lead text-center">Nearest City to DataPoint: @JObjects.NearestCity</p>
+                        }
+                    </div>
+                    <div class="col-xs-12 col-sm-6">
+                        <p class="lead text-center">Lat of DataPoint: @JObjects.Lat</p>
+                    </div>
+                    <div class="col-xs-12 col-sm-6">
+                        <p class="lead text-center">Lon of DataPoint: @JObjects.Lon</p>
+                    </div>
+
+                    <div class="card-columns" style="column-count: 2; padding-right:1em">
+                        <div class="card">
+                            <div class="card-block">
+                                <h5 class="card-header">Tide Data #1</h5>
+                                <div class="card-body">
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Time: @JObjects.TideDataSet[0].TideTime</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Height(m): @JObjects.TideDataSet[0].TideHeight</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Type: @JObjects.TideDataSet[0].TideType</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-block">
+                                <h5 class="card-header">Tide Data #2</h5>
+                                <div class="card-body">
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Time: @JObjects.TideDataSet[1].TideTime</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Height(m): @JObjects.TideDataSet[1].TideHeight</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Type: @JObjects.TideDataSet[1].TideType</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-block">
+                                <h5 class="card-header">Tide Data #3</h5>
+                                <div class="card-body">
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Time: @JObjects.TideDataSet[2].TideTime</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Height(m): @JObjects.TideDataSet[2].TideHeight</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Type: @JObjects.TideDataSet[2].TideType</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-block">
+                                <h5 class="card-header">Tide Data #4</h5>
+                                <div class="card-body">
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Time: @JObjects.TideDataSet[3].TideTime</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Height(m): @JObjects.TideDataSet[3].TideHeight</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Type: @JObjects.TideDataSet[3].TideType</p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
+
+            <div class="col-xs-12 col-sm-12">
+                <hr />
+                <h4 class="text-center">3 Hourly Weather Data</h4>
+            </div>
+
+            <div class="col-xs-12 col-sm-12">
+
+                <table class="table table-bordered table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th scope="col">Hours</th>
+                            <th scope="col">00:00</th>
+                            <th scope="col">03:00</th>
+                            <th scope="col">06:00</th>
+                            <th scope="col">09:00</th>
+                            <th scope="col">12:00</th>
+                            <th scope="col">15:00</th>
+                            <th scope="col">18:00</th>
+                            <th scope="col">21:00</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <th>Temps</th>
+                            <td>@JObjects.Hours.ElementAt(0) °c</td>
+                            <td>@JObjects.Hours.ElementAt(1) °c</td>
+                            <td>@JObjects.Hours.ElementAt(2) °c</td>
+                            <td>@JObjects.Hours.ElementAt(3) °c</td>
+                            <td>@JObjects.Hours.ElementAt(4) °c</td>
+                            <td>@JObjects.Hours.ElementAt(5) °c</td>
+                            <td>@JObjects.Hours.ElementAt(6) °c</td>
+                            <td>@JObjects.Hours.ElementAt(7) °c</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+            </div>
+
+            <div class="col-xs-12 col-sm-12">
+                <h4 class="text-center">3 Hourly Tide Swell Data</h4>
+            </div>
+
+            <div class="col-xs-12 col-sm-12">
+
+                <table class="table table-bordered table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th scope="col">Hours</th>
+                            <th scope="col">00:00</th>
+                            <th scope="col">03:00</th>
+                            <th scope="col">06:00</th>
+                            <th scope="col">09:00</th>
+                            <th scope="col">12:00</th>
+                            <th scope="col">15:00</th>
+                            <th scope="col">18:00</th>
+                            <th scope="col">21:00</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <th>Significant Wave Height(m)</th>
+                            @for (int i = 0; i < tempSwellList.Count(); i++)
+                            {
+                                if (string.Equals((JObjects.SwellDataSet[i].SigWaveHeight), "-999.0"))
+                                {
+                                    <td>NA</td>
+                                }
+                                else
+                                {
+                                    <td>@JObjects.SwellDataSet[i].SigWaveHeight</td>
+                                }
+                                if (tempSwellList.Count() < 8 && i == 6)
+                                {
+                                    <td>NA</td>
+                                }
+                            }
+                        </tr>
+                        <tr>
+                            <th>Swell Height(m)</th>
+                            @for (int i = 0; i < tempSwellList.Count(); i++)
+                            {
+                                if (string.Equals((JObjects.SwellDataSet[i].SwellHeightM), "-999.0"))
+                                {
+                                    <td>NA</td>
+                                }
+                                else
+                                {
+                                    <td>@JObjects.SwellDataSet[i].SwellHeightM</td>
+                                }
+                                if (tempSwellList.Count() < 8 && i == 6)
+                                {
+                                    <td>NA</td>
+                                }
+                            }
+                        </tr>
+                        <tr>
+                            <th>Swell Period(seconds)</th>
+                            @for (int i = 0; i < tempSwellList.Count(); i++)
+                            {
+                                if (string.Equals((JObjects.SwellDataSet[i].SwellPeriodS), "-999.0"))
+                                {
+                                    // API some
+                                    <td>NA</td>
+                                }
+                                else
+                                {
+                                    <td>@JObjects.SwellDataSet[i].SwellPeriodS</td>
+                                }
+                                if (tempSwellList.Count() < 8 && i == 6)
+                                {
+                                    <td>NA</td>
+                                }
+                            }
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p>Is your Swell data NA? That's because worldweatheronline.com API is returning them as -999.0, want proof? <a href="#" @onclick="ShowJsonCode">Click here to view JSON</a> Or view your forecast history to see stored value.</p>
+                @if (JsonCodeShow)
+                {
+                    <pre class="pre-scrollable">
+                    <code>
+                    <span>@ProofAPI</span>
+                    <span></span>
+                            </code>
+                    </pre>
+                }
+            </div>
+
+
+            <div class="col-xs-12 col-sm-3"><button class="btn btn-success" @onclick="SaveFav">Save to Favourites Table</button><p></p></div>
+            <div class="col-xs-12 col-sm-12">
+                <p style="color:red">@saveMessage</p>
+            </div>
+        </div>
+
+        <hr />
+
+        <div calss="row">
+            <div class="col-xs-12 col-sm-12"><h1 class="display-4" style="text-align: center">Favourite Locations</h1></div>
+            @if (DisplayFavClicked)
+            {
+                <div class="card-columns">
+                    @for (int i = 0; i < @totalFav; i++)
+                    {
+                        var local = i;
+                        <div class="card">
+
+
+                            <div class="card-block">
+                                <h5 class="card-header">Favourite #@(local + 1)</h5>
+                                <div class="card-body">
+                                    <h5 class="card-title"> @ObjectsFromDB[local].Location.</h5>
+                                    <button class="btn btn-primary" @onclick="() => viewDataTest(local)">View Data</button>
+                                    <button class="btn btn-danger" @onclick="() => delData(local)">Delete Data</button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+    }
+    else if (viewDataTestClicked)
+    {
+        <div class="row border border-secondary">
+            <div class="col-xs-12 col-sm-6">
+                <h3 class="text-center">Weather Data</h3>
+                <p class="lead text-center">@JObjects.Location</p>
+                <p class="lead text-center">Date: @JObjects.Date.ToString("dd/MM/yyyy")</p>
+                <p class="lead text-center">Time: @JObjects.ObservedTime</p>
+                <p class="lead text-center">Temperature: @JObjects.TempC °</p>
+                <p class="lead text-center">Real Feel: @JObjects.RealFeel °</p>
+                <p class="lead text-center">Humidity: @JObjects.Humidity</p>
+                <p class="lead text-center">Description: @JObjects.WeatherDescription</p>
+                <p class="lead text-center">Windspeed KMPH: @JObjects.WindSpeedKMPH</p>
+                <p class="lead text-center">Wind Direction: @JObjects.WindDirection</p>
+            </div>
+
+
+            <div class="col-xs-12 col-sm-6">
+                <div class="row">
+                    <div class="col-xs-12 col-sm-12">
+                        <h3 class="text-center">Marine Data</h3>
+                        @if (string.IsNullOrWhiteSpace(JObjects.NearestCity))
+                        {
+                            <p class="lead text-center">NA, no near city found</p>
+                        }
+                        else
+                        {
+                            <p class="lead text-center">Nearest City to DataPoint: @JObjects.NearestCity</p>
+                        }
+                    </div>
+                    <div class="col-xs-12 col-sm-6">
+                        <p class="lead text-center">Lat of DataPoint: @JObjects.Lat</p>
+                    </div>
+                    <div class="col-xs-12 col-sm-6">
+                        <p class="lead text-center">Lon of DataPoint: @JObjects.Lon</p>
+                    </div>
+
+                    <div class="card-columns" style="column-count: 2; padding-right:1em">
+                        <div class="card">
+                            <div class="card-block">
+                                <h5 class="card-header">Tide Data #1</h5>
+                                <div class="card-body">
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Time: @JObjects.TideDataSet[0].TideTime</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Height(m): @JObjects.TideDataSet[0].TideHeight</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Type: @JObjects.TideDataSet[0].TideType</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-block">
+                                <h5 class="card-header">Tide Data #2</h5>
+                                <div class="card-body">
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Time: @JObjects.TideDataSet[1].TideTime</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Height(m): @JObjects.TideDataSet[1].TideHeight</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Type: @JObjects.TideDataSet[1].TideType</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-block">
+                                <h5 class="card-header">Tide Data #3</h5>
+                                <div class="card-body">
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Time: @JObjects.TideDataSet[2].TideTime</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Height(m): @JObjects.TideDataSet[2].TideHeight</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Type: @JObjects.TideDataSet[2].TideType</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-block">
+                                <h5 class="card-header">Tide Data #4</h5>
+                                <div class="card-body">
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Time: @JObjects.TideDataSet[3].TideTime</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Height(m): @JObjects.TideDataSet[3].TideHeight</p>
+                                    <p style="margin-bottom:0;" class="lead card-text">Tide Type: @JObjects.TideDataSet[3].TideType</p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
+
+            <div class="col-xs-12 col-sm-12">
+                <hr />
+                <h4 class="text-center">3 Hourly Weather Data</h4>
+            </div>
+
+            <div class="col-xs-12 col-sm-12">
+
+                <table class="table table-bordered table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th scope="col">Hours</th>
+                            <th scope="col">00:00</th>
+                            <th scope="col">03:00</th>
+                            <th scope="col">06:00</th>
+                            <th scope="col">09:00</th>
+                            <th scope="col">12:00</th>
+                            <th scope="col">15:00</th>
+                            <th scope="col">18:00</th>
+                            <th scope="col">21:00</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <th>Temps</th>
+                            <td>@JObjects.Hours.ElementAt(0) °c</td>
+                            <td>@JObjects.Hours.ElementAt(1) °c</td>
+                            <td>@JObjects.Hours.ElementAt(2) °c</td>
+                            <td>@JObjects.Hours.ElementAt(3) °c</td>
+                            <td>@JObjects.Hours.ElementAt(4) °c</td>
+                            <td>@JObjects.Hours.ElementAt(5) °c</td>
+                            <td>@JObjects.Hours.ElementAt(6) °c</td>
+                            <td>@JObjects.Hours.ElementAt(7) °c</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+            </div>
+
+            <div class="col-xs-12 col-sm-12">
+                <h4 class="text-center">3 Hourly Tide Swell Data</h4>
+            </div>
+
+            <div class="col-xs-12 col-sm-12">
+
+                <table class="table table-bordered table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th scope="col">Hours</th>
+                            <th scope="col">00:00</th>
+                            <th scope="col">03:00</th>
+                            <th scope="col">06:00</th>
+                            <th scope="col">09:00</th>
+                            <th scope="col">12:00</th>
+                            <th scope="col">15:00</th>
+                            <th scope="col">18:00</th>
+                            <th scope="col">21:00</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <th>Significant Wave Height(m)</th>
+                            @for (int i = 0; i < tempSwellList.Count(); i++)
+                            {
+                                if (string.Equals((JObjects.SwellDataSet[i].SigWaveHeight), "-999.0"))
+                                {
+                                    <td>NA</td>
+                                }
+                                else
+                                {
+                                    <td>@JObjects.SwellDataSet[i].SigWaveHeight</td>
+                                }
+                                if (tempSwellList.Count() < 8 && i == 6)
+                                {
+                                    <td>NA</td>
+                                }
+                            }
+                        </tr>
+                        <tr>
+                            <th>Swell Height(m)</th>
+                            @for (int i = 0; i < tempSwellList.Count(); i++)
+                            {
+                                if (string.Equals((JObjects.SwellDataSet[i].SwellHeightM), "-999.0"))
+                                {
+                                    <td>NA</td>
+                                }
+                                else
+                                {
+                                    <td>@JObjects.SwellDataSet[i].SwellHeightM</td>
+                                }
+                                if (tempSwellList.Count() < 8 && i == 6)
+                                {
+                                    <td>NA</td>
+                                }
+                            }
+                        </tr>
+                        <tr>
+                            <th>Swell Period(seconds)</th>
+                            @for (int i = 0; i < tempSwellList.Count(); i++)
+                            {
+                                if (string.Equals((JObjects.SwellDataSet[i].SwellPeriodS), "-999.0"))
+                                {
+                                    // API some
+                                    <td>NA</td>
+                                }
+                                else
+                                {
+                                    <td>@JObjects.SwellDataSet[i].SwellPeriodS</td>
+                                }
+                                if (tempSwellList.Count() < 8 && i == 6)
+                                {
+                                    <td>NA</td>
+                                }
+                            }
+                        </tr>
+                    </tbody>
+                </table>
+                <p>Is your Swell data NA? That's because worldweatheronline.com API is returning them as -999.0, want proof? <a href="#" @onclick="ShowJsonCode">Click here to view JSON</a> Or view your forecast history to see stored value.</p>
+                @if (JsonCodeShow)
+                {
+                    <pre class="pre-scrollable">
+                    <code>
+                    <span>@ProofAPI</span>
+                    <span></span>
+                                    </code>
+                     </pre>
+                }
+
+            </div>
+
+
+            <div class="col-xs-12 col-sm-3"><button class="btn btn-success" @onclick="SaveFav">Save to Favourites Table</button><p></p></div>
+            <div class="col-xs-12 col-sm-12">
+                <p style="color:red">@saveMessage</p>
+            </div>
+        </div>
+
+        <hr />
+
+        <div calss="row">
+            <div class="col-xs-12 col-sm-12"><h1 class="display-4" style="text-align: center">Favourite Locations</h1></div>
+            @if (DisplayFavClicked)
+            {
+                <div class="card-columns">
+                    @for (int i = 0; i < @totalFav; i++)
+                    {
+                        var local = i;
+                        <div class="card">
+
+
+                            <div class="card-block">
+                                <h5 class="card-header">Favourite #@(local + 1)</h5>
+                                <div class="card-body">
+                                    <h5 class="card-title"> @ObjectsFromDB[local].Location.</h5>
+                                    <button class="btn btn-primary" @onclick="() => viewDataTest(local)">View Data</button>
+                                    <button class="btn btn-danger" @onclick="() => delData(local)">Delete Data</button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-xs-12 col-sm-12">
+                <p>Button is not clicked yet.</p>
+            </div>
+        </div>
+
+        <hr />
+
+        <div calss="row">
+            <div class="col-xs-12 col-sm-12"><h1 class="display-4" style="text-align: center">Favourite Locations</h1></div>
+            @if (DisplayFavClicked)
+            {
+                <div class="card-columns">
+                    @for (int i = 0; i < @totalFav; i++)
+                    {
+                        var local = i;
+                        <div class="card">
+
+
+                            <div class="card-block">
+                                <h5 class="card-header">Favourite #@(local + 1)</h5>
+                                <div class="card-body">
+                                    <h5 class="card-title"> @ObjectsFromDB[local].Location.</h5>
+                                    <button class="btn btn-primary" @onclick="() => viewDataTest(local)">View Data</button>
+                                    <button class="btn btn-danger" @onclick="() => delData(local)">Delete Data</button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+
+@code{
+    //https://www.mapquestapi.com/geocoding/v1/address?key=5OeFCMN0aaCI7VpJfIgZ7O2k2iAA8EdU&location=Birmingham,GB&outFormat=json
+    //API to convert City to Long Lat
+
+
+    private string URI = "https://api.worldweatheronline.com/premium/v1/weather.ashx?key=1df0c1bc1ff942c08fd05853192911&q=Coventry,united+kingdom&num_of_days=1&format=json";
+    private string baseURL = "https://api.worldweatheronline.com/premium/v1/weather.ashx?";
+    private string APIKey = "key=1df0c1bc1ff942c08fd05853192911";
+    private string location = "Coventry";
+
+    IndexObjects JObjects;
+    bool CitySearchClicked = false;
+    bool DisplayFavClicked = false;
+    bool viewDataTestClicked = false;
+    String saveMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await TokenProvider.GetTokenAsync();
+        if (token != null)
+        {
+            Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            await DisplayFav();
+            await grabHistoryData();
+        }
+
+    }
+
+    bool JsonCodeShow = false;
+    public void ShowJsonCode()
+    {
+        JsonCodeShow = true;
+    }
+
+
+    List<SwellData> tempSwellList;
+    string ProofAPI = "";
+    /// <summary>
+    /// The primary functionality for index page. This is called when the search button is clicked to return todays forecast. It grabs data
+    /// from 4x different API reuqests in order to store information on the weather, mearine data and the nearest datapoint to the input location.
+    /// The call order is first grabs weather data through localWeather API at WorldWeatherOnline
+    /// Next, Then it sends the Location into a GeoCoding api at mapQuest to convert City to Lat Long
+    /// Then the generated Lat and Lon is sent to the MarineData API to grab marine data,
+    /// Finally the included Lat and Lon from the MarineData API request has lat and lon for the Marine Data Point
+    /// THis is sent into a reverse GeoCoder API to attempt to find the nearest City/Town to the MarineData Point
+    /// Then all the respective data is presented through Bootstrap HTML
+    /// </summary>
+    private async Task CitySearch()
+    {
+        //Local Weather API
+        String str = await Http.GetStringAsync($"{baseURL}{APIKey}&q={location},united+kingdom&num_of_days=1&format=json");
+        JObject json = JObject.Parse(str);
+
+        //Uses location entered for Weather forecast to grab JSON object contain Lat & Long data for location
+        //GeoCode API
+        String geoCodeStre = await Http.GetStringAsync($"https://www.mapquestapi.com/geocoding/v1/address?key=5OeFCMN0aaCI7VpJfIgZ7O2k2iAA8EdU&location={location},GB&outFormat=json");
+        JObject gcOBJ = JObject.Parse(geoCodeStre);
+
+        String tempLat = gcOBJ["results"][0]["locations"][0]["latLng"]["lat"].ToString();
+        String tempLon = gcOBJ["results"][0]["locations"][0]["latLng"]["lng"].ToString();
+
+        Console.WriteLine("Lat of Location Entered:" + tempLat);
+        Console.WriteLine("Lon of Location Entered:" + tempLon);
+
+        //Marine Data API
+        String mrnStr = await Http.GetStringAsync($"https://api.worldweatheronline.com/premium/v1/marine.ashx?key=1df0c1bc1ff942c08fd05853192911&q={tempLat},{tempLon}&tide=yes&format=json&includelocation=yes");
+        JObject mrnOBJ = JObject.Parse(mrnStr);
+        String tempLat2 = mrnOBJ["data"]["nearest_area"][0]["latitude"].ToString();
+        String tempLon2 = mrnOBJ["data"]["nearest_area"][0]["longitude"].ToString();
+
+        //MarineDataPoint Lat & Lon to nearest City
+        //GeoCode Reverse API
+        String ncStr = await Http.GetStringAsync($"https://www.mapquestapi.com/geocoding/v1/reverse?key=5OeFCMN0aaCI7VpJfIgZ7O2k2iAA8EdU&location={tempLat2},{tempLon2}&outFormat=json");
+        JObject ncOBJ = JObject.Parse(ncStr);
+        ProofAPI = mrnStr;
+        Console.WriteLine("API String for marine data:" + ProofAPI);
+
+        var inputCulture = CultureInfo.CreateSpecificCulture("en-GB");
+
+        Console.WriteLine("Check 3");
+
+        //Swell Data check if hours returns 6 or 7 values
+        //Discovered through late night testing that Swell data will sometimes only generate 3 hourly intervals until 6pm if the API is called at early hours in the morning such as 1am
+        //Due to this the 9pm Column now HAS to allow null valus and this loop will determine how big to instantiate the data set
+        JArray SwellCount = JArray.FromObject(mrnOBJ["data"]["weather"][0]["hourly"]);
+        Console.WriteLine("SwellCount Size = " + SwellCount.Count());
+
+        tempSwellList = new List<SwellData>();
+        for (int i = 0; i < SwellCount.Count(); i++)
+        {
+            tempSwellList.Add(new SwellData
+            {
+                SigWaveHeight = mrnOBJ["data"]["weather"][0]["hourly"][i]["sigHeight_m"].ToString(),
+                SwellHeightM = mrnOBJ["data"]["weather"][0]["hourly"][i]["swellHeight_m"].ToString(),
+                SwellPeriodS = mrnOBJ["data"]["weather"][0]["hourly"][i]["swellPeriod_secs"].ToString()
+            });
+        };
+
+
+        Console.WriteLine("tempSwellList Size = " + tempSwellList.Count());
+        Console.WriteLine("tempSwellList SigWaveHeight #1 = " + tempSwellList[0].SigWaveHeight);
+        Console.WriteLine("tempSwellList SigWaveHeight #2 = " + tempSwellList[1].SigWaveHeight);
+        Console.WriteLine("tempSwellList SigWaveHeight #3 = " + tempSwellList[2].SigWaveHeight);
+        Console.WriteLine("tempSwellList SigWaveHeight #4 = " + tempSwellList[3].SigWaveHeight);
+        Console.WriteLine("tempSwellList SigWaveHeight #5 = " + tempSwellList[4].SigWaveHeight);
+        Console.WriteLine("tempSwellList SigWaveHeight #6 = " + tempSwellList[5].SigWaveHeight);
+        Console.WriteLine("tempSwellList SigWaveHeight #7 = " + tempSwellList[6].SigWaveHeight);
+        Console.WriteLine("First REAL Val = " + mrnOBJ["data"]["weather"][0]["hourly"][0]["sigHeight_m"].ToString());
+
+        JObjects = new IndexObjects
+        {
+            Count = SwellCount.Count(),
+            Date = Convert.ToDateTime(json["data"]["weather"][0]["date"].ToString(), inputCulture),
+            Location = json["data"]["request"][0]["query"].ToString(),
+            ObservedTime = json["data"]["current_condition"][0]["observation_time"].ToString(),
+            TempC = json["data"]["current_condition"][0]["temp_C"].ToString(),
+            WeatherDescription = json["data"]["current_condition"][0]["weatherDesc"][0]["value"].ToString(),
+            WindSpeedKMPH = json["data"]["current_condition"][0]["windspeedKmph"].ToString(),
+            WindDirection = json["data"]["current_condition"][0]["winddir16Point"].ToString(),
+            Humidity = json["data"]["current_condition"][0]["humidity"].ToString(),
+            RealFeel = json["data"]["current_condition"][0]["FeelsLikeC"].ToString(),
+
+            Hours = new List<String> {
+                json["data"]["weather"][0]["hourly"][0]["tempC"].ToString(),
+                json["data"]["weather"][0]["hourly"][1]["tempC"].ToString(),
+                json["data"]["weather"][0]["hourly"][2]["tempC"].ToString(),
+                json["data"]["weather"][0]["hourly"][3]["tempC"].ToString(),
+                json["data"]["weather"][0]["hourly"][4]["tempC"].ToString(),
+                json["data"]["weather"][0]["hourly"][5]["tempC"].ToString(),
+                json["data"]["weather"][0]["hourly"][6]["tempC"].ToString(),
+                json["data"]["weather"][0]["hourly"][7]["tempC"].ToString()
+            },
+
+            //Store lat and lon of nearest Marine Data point
+            Lat = mrnOBJ["data"]["nearest_area"][0]["latitude"].ToString(),
+            Lon = mrnOBJ["data"]["nearest_area"][0]["longitude"].ToString(),
+            NearestCity = ncOBJ["results"][0]["locations"][0]["adminArea5"].ToString(),
+
+            TideDataSet = new List<TideData>
+        {
+                new TideData
+                {
+                    TideTime = mrnOBJ["data"]["weather"][0]["tides"][0]["tide_data"][0]["tideTime"].ToString(),
+                    TideHeight = mrnOBJ["data"]["weather"][0]["tides"][0]["tide_data"][0]["tideHeight_mt"].ToString(),
+                    TideType = mrnOBJ["data"]["weather"][0]["tides"][0]["tide_data"][0]["tide_type"].ToString()
+                },
+                new TideData
+                {
+                    TideTime = mrnOBJ["data"]["weather"][0]["tides"][0]["tide_data"][1]["tideTime"].ToString(),
+                    TideHeight = mrnOBJ["data"]["weather"][0]["tides"][0]["tide_data"][1]["tideHeight_mt"].ToString(),
+                    TideType = mrnOBJ["data"]["weather"][0]["tides"][0]["tide_data"][1]["tide_type"].ToString()
+                },
+                new TideData
+                {
+                    TideTime = mrnOBJ["data"]["weather"][0]["tides"][0]["tide_data"][2]["tideTime"].ToString(),
+                    TideHeight = mrnOBJ["data"]["weather"][0]["tides"][0]["tide_data"][2]["tideHeight_mt"].ToString(),
+                    TideType = mrnOBJ["data"]["weather"][0]["tides"][0]["tide_data"][2]["tide_type"].ToString()
+                },
+                new TideData
+                {
+                    TideTime = mrnOBJ["data"]["weather"][0]["tides"][0]["tide_data"][3]["tideTime"].ToString(),
+                    TideHeight = mrnOBJ["data"]["weather"][0]["tides"][0]["tide_data"][3]["tideHeight_mt"].ToString(),
+                    TideType = mrnOBJ["data"]["weather"][0]["tides"][0]["tide_data"][3]["tide_type"].ToString()
+                }
+            },
+
+            SwellDataSet = tempSwellList
+
+
+        };
+
+        CitySearchClicked = true;
+        viewDataTestClicked = false;
+
+        grabCalled = true;
+
+        Console.WriteLine("Check 1");
+        //Ensures no duplicates are stored in Data history tables
+        foreach (var obj in IndexHistory)
+        {
+            if (string.Equals(obj.Location.Split(',')[0], JObjects.Location.Split(',')[0])) //Location Check | Does Location exist in DB?
+            {
+
+                //Date is pulled in the format mm-dd-yyyy
+                //This will swap the arrangement to dd-mm-yyyy
+                List<String> tempDateVals = new List<String>();
+                tempDateVals.Add((obj.Date.ToString("dd/MM/yyyy")).Split('/')[0]);
+                tempDateVals.Add((obj.Date.ToString("dd/MM/yyyy")).Split('/')[1]);
+                tempDateVals.Add((obj.Date.ToString("dd/MM/yyyy")).Split('/')[2]);
+
+                String tempDate = "";
+                tempDate += (tempDateVals[1] + "/" + tempDateVals[0] + "/" + tempDateVals[2]);
+
+                if (string.Equals(tempDate, JObjects.Date.ToString("dd/MM/yyyy"))) //Date Check | Location exists, does Date for said location exist in DB?
+                {
+                    if (string.Equals((obj.ObservedTime.Split(' ')[0] + obj.ObservedTime.Split(' ')[1]), (JObjects.ObservedTime.Split(' ')[0] + JObjects.ObservedTime.Split(' ')[1])))
+                    {
+                        //ObservedTime Check | Observed Time e.g: '18:41 PM  ' Concatenates digits and AM/PM removing excess ' ' then checks equivalence
+                        //This is necessary because the data is stored with excess ' ' characters after the AM/PM meaning euivalent checks will not work beforehand
+                        grabCalled = false;
+                    }
+                    else //ObservedTime Check | if not post to history
+                    {
+                    }
+                }
+                else //Date Check | if not Post to history
+                {
+                }
+            }
+            else //Location check | if not Post to history
+            {
+            }
+        }
+
+        Console.WriteLine("Check 2");
+
+        if (grabCalled)
+        {
+            Console.WriteLine("Successfully added forecast to History tables.");
+            await Http.PostJsonAsync("IndexObjects/Post", JObjects);
+            await grabHistoryData();
+        }
+        else
+        {
+            Console.WriteLine("Unsuccessful History addition Duplicate entry attempted.");
+        }
+    }
+
+
+    FavouriteObjects FObjects;
+    /// <summary>
+    /// The function that savaes the location data to the Favourites table , it iterates over the existing locations and if the data
+    /// already exists then nothing is posted to the Controller.
+    /// </summary>
+    /// <returns></returns>
+    private async Task SaveFav()
+    {
+        bool doIt = true;
+        foreach (var obj in ObjectsFromDB)
+        {
+            if (string.Equals(obj.Location.Split(',')[0], JObjects.Location.Split(',')[0]))
+            {
+                doIt = false;
+            }
+        }
+
+        if (doIt)
+        {
+            saveMessage = "Location added to Favourites.";
+            FObjects = new FavouriteObjects
+            {
+                Location = JObjects.Location
+            };
+            await Http.PostJsonAsync("FavouriteObjects/Post", FObjects);
+            Console.WriteLine("Location added to Favourites. Reload page to view.");
+            await DisplayFav();
+        }
+        else
+        {
+            saveMessage = "Location is already in Favourites.";
+            Console.WriteLine("Location is already in favourites.");
+        }
+    }
+
+    private IndexObjects[] IndexHistory;
+    private bool grabCalled = true;
+    private async Task grabHistoryData()
+    {
+        IndexHistory = await Http.GetJsonAsync<IndexObjects[]>("IndexObjects/Get");
+    }
+
+
+    private FavouriteObjects[] ObjectsFromDB;
+    private int totalFav;
+    private async Task DisplayFav()
+    {
+        //Get Disabled To Test
+        ObjectsFromDB = await Http.GetJsonAsync<FavouriteObjects[]>("FavouriteObjects/Get");
+        totalFav = ObjectsFromDB.Count();
+
+        DisplayFavClicked = true; //false test
+    }
+
+    /// <summary>
+    /// Used to determine if data should be loaded from saved location or API calls
+    /// </summary>
+    /// <param name="i"> Object reference identifier</param>
+    private async Task viewDataTest(int i)
+    {
+        saveMessage = null;
+        location = ObjectsFromDB[i].Location.Split(',')[0];
+        await CitySearch();
+
+        viewDataTestClicked = true;
+        CitySearchClicked = false;
+    }
+
+    private async Task delData(int i)
+    {
+        string CLocation = ObjectsFromDB[i].Location;
+        await Http.DeleteAsync($"FavouriteObjects/Delete/{CLocation}");
+        await DisplayFav();
+    }
+}

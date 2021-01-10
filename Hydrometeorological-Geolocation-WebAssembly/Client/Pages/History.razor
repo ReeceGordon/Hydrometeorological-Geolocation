@@ -1,0 +1,264 @@
+﻿@page "/history"
+@using Hydrometeorological_Geolocation_Prototype_V2.Shared
+@using System.Net.Http.Headers;
+@using Hydrometeorological_Geolocation_Prototype_V2.Client.AuthenticationStateProviders
+@inject HttpClient Http
+@inject TokenAuthenticationStateProvider TokenProvider
+@attribute [Authorize]
+
+@using System.Text
+
+<div class="container">
+    <div class="row">
+
+        <div class="col-xs-12 col-sm-12">
+
+            <h1 class="display-1">History</h1>
+            <h4>Would you like to load your past history of current forecasts? <button class="btn btn-success" @onclick="ShowHistory">Yes!</button></h4>
+
+            @if (showHistoryCheck)
+            {
+                <hr />
+                foreach (var obj in unqDates)
+                {
+                    <h1>@obj</h1>
+                    foreach (var obL in unqLocation)
+                    {
+
+                        foreach (var obIO in IOHistory)
+                        {
+                            if (obIO.Location == obL && obIO.Date.ToString("dd/MM/yyyy") == obj)
+                            {
+                                var chars = "ABCDEFGHIJKLMOP";
+                                var stringChars = new char[5];
+                                var random = new Random();
+                                for (int i = 0; i < stringChars.Length; i++)
+                                {
+                                    stringChars[i] = chars[random.Next(chars.Length)];
+                                }
+
+                                var finalString = new String(stringChars);
+
+                                <h3>@obL</h3>
+                                <table class="table table-bordered table-hover">
+                                    <thead class="thead-dark">
+                                        <tr>
+                                            <th style="border-color:#343a40" scope="col">Time Searched: @obIO.ObservedTime</th>
+                                            <th style="border-color:#343a40" scope="col"></th>
+                                            <th style="border-color:#343a40" scope="col"></th>
+                                            <th style="border-color:#343a40" scope="col"></th>
+                                            <th style="border-color:#343a40" scope="col"></th>
+                                            <th style="border-color:#343a40" scope="col"></th>
+                                            <th style="border-color:#343a40" scope="col"></th>
+                                            <th style="border-color:#343a40" scope="col"></th>
+                                            <th style="border-color:#343a40" scope="col"></th>
+                                        </tr>
+                                    </thead>
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th scope="col">Temperature</th>
+                                            <th scope="col">Description</th>
+                                            <th scope="col">Wind Speed</th>
+                                            <th scope="col">Wind Direction</th>
+                                            <th scope="col">Humidity</th>
+                                            <th scope="col">Real Feel</th>
+                                            <th scope="col">Latitude</th>
+                                            <th scope="col">Longitude</th>
+                                            <th scope="col">Nearest City</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>@obIO.TempC °c</td>
+                                            <td>@obIO.WeatherDescription</td>
+                                            <td>@obIO.WindSpeedKMPH KMPH</td>
+                                            <td>@obIO.WindDirection</td>
+                                            <td>@obIO.Humidity</td>
+                                            <td>@obIO.RealFeel °c</td>
+                                            <td>@obIO.Lat</td>
+                                            <td>@obIO.Lon</td>
+                                            @if (string.IsNullOrWhiteSpace(obIO.NearestCity))
+                                            {
+                                                <td>NA, No near city Found</td>
+                                            }
+                                            else
+                                            {
+                                                <td>@obIO.NearestCity</td>
+                                            }
+                                        </tr>
+                                    </tbody>
+                                    <thead class="collapse thead-light" id="@finalString">
+                                        <tr>
+                                            <th scope="col">Hours</th>
+                                            <th scope="col">00:00</th>
+                                            <th scope="col">03:00</th>
+                                            <th scope="col">06:00</th>
+                                            <th scope="col">09:00</th>
+                                            <th scope="col">12:00</th>
+                                            <th scope="col">15:00</th>
+                                            <th scope="col">18:00</th>
+                                            <th scope="col">21:00</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="collapse" id="@finalString">
+                                        <tr>
+                                            <th style="color: #495057;">Temps</th>
+                                            <td>@obIO.Hours[0] °c</td>
+                                            <td>@obIO.Hours[1] °c</td>
+                                            <td>@obIO.Hours[2] °c</td>
+                                            <td>@obIO.Hours[3] °c</td>
+                                            <td>@obIO.Hours[4] °c</td>
+                                            <td>@obIO.Hours[5] °c</td>
+                                            <td>@obIO.Hours[6] °c</td>
+                                            <td>@obIO.Hours[7] °c</td>
+                                        </tr>
+                                    </tbody>
+                                    <tbody class="collapse" id="@finalString">
+                                        <tr>
+                                            <th style="color: #495057;">Sig Wave Height</th>
+                                            <td>@obIO.SwellDataSet[0].SigWaveHeight (m)</td>
+                                            <td>@obIO.SwellDataSet[1].SigWaveHeight (m)</td>
+                                            <td>@obIO.SwellDataSet[2].SigWaveHeight (m)</td>
+                                            <td>@obIO.SwellDataSet[3].SigWaveHeight (m)</td>
+                                            <td>@obIO.SwellDataSet[4].SigWaveHeight (m)</td>
+                                            <td>@obIO.SwellDataSet[5].SigWaveHeight (m)</td>
+                                            <td>@obIO.SwellDataSet[6].SigWaveHeight (m)</td>
+                                            <td>@obIO.SwellDataSet[7].SigWaveHeight (m)</td>
+                                        </tr>
+                                    </tbody>
+                                    <tbody class="collapse" id="@finalString">
+                                        <tr>
+                                            <th style="color: #495057;">Swell Height</th>
+                                            <td>@obIO.SwellDataSet[0].SwellHeightM (m)</td>
+                                            <td>@obIO.SwellDataSet[1].SwellHeightM (m)</td>
+                                            <td>@obIO.SwellDataSet[2].SwellHeightM (m)</td>
+                                            <td>@obIO.SwellDataSet[3].SwellHeightM (m)</td>
+                                            <td>@obIO.SwellDataSet[4].SwellHeightM (m)</td>
+                                            <td>@obIO.SwellDataSet[5].SwellHeightM (m)</td>
+                                            <td>@obIO.SwellDataSet[6].SwellHeightM (m)</td>
+                                            <td>@obIO.SwellDataSet[7].SwellHeightM (m)</td>
+                                        </tr>
+                                    </tbody>
+                                    <tbody class="collapse" id="@finalString">
+                                        <tr>
+                                            <th style="color: #495057;">Swell Period </th>
+                                            <td>@obIO.SwellDataSet[0].SwellPeriodS (sec)</td>
+                                            <td>@obIO.SwellDataSet[1].SwellPeriodS (sec)</td>
+                                            <td>@obIO.SwellDataSet[2].SwellPeriodS (sec)</td>
+                                            <td>@obIO.SwellDataSet[3].SwellPeriodS (sec)</td>
+                                            <td>@obIO.SwellDataSet[4].SwellPeriodS (sec)</td>
+                                            <td>@obIO.SwellDataSet[5].SwellPeriodS (sec)</td>
+                                            <td>@obIO.SwellDataSet[6].SwellPeriodS (sec)</td>
+                                            <td>@obIO.SwellDataSet[7].SwellPeriodS (sec)</td>
+                                        </tr>
+                                    </tbody>
+
+                                    <thead class="collapse thead-light" id="@finalString">
+                                        <tr>
+                                            <th scope="col">Tidal Data</th>
+                                            <th scope="col">Tide Time</th>
+                                            <th scope="col">Tide Height</th>
+                                            <th scope="col">Tide Type</th>
+                                            <th scope="col"></th>
+                                            <th scope="col"></th>
+                                            <th scope="col"></th>
+                                            <th scope="col"></th>
+                                            <th scope="col"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="collapse" id="@finalString">
+                                        <tr>
+                                            <th style="color: #495057;">Data #1</th>
+                                            <td>@obIO.TideDataSet[0].TideTime</td>
+                                            <td>@obIO.TideDataSet[0].TideHeight</td>
+                                            <td>@obIO.TideDataSet[0].TideType</td>
+                                        </tr>
+                                    </tbody>
+                                    <tbody class="collapse" id="@finalString">
+                                        <tr>
+                                            <th style="color: #495057;">Data #2</th>
+                                            <td>@obIO.TideDataSet[1].TideTime</td>
+                                            <td>@obIO.TideDataSet[1].TideHeight</td>
+                                            <td>@obIO.TideDataSet[1].TideType</td>
+                                        </tr>
+                                    </tbody>
+                                    <tbody class="collapse" id="@finalString">
+                                        <tr>
+                                            <th style="color: #495057;">Data #3</th>
+                                            <td>@obIO.TideDataSet[2].TideTime</td>
+                                            <td>@obIO.TideDataSet[2].TideHeight</td>
+                                            <td>@obIO.TideDataSet[2].TideType</td>
+                                        </tr>
+                                    </tbody>
+                                    <tbody class="collapse" id="@finalString">
+                                        <tr>
+                                            <th style="color: #495057;">Data #4</th>
+                                            <td>@obIO.TideDataSet[3].TideTime</td>
+                                            <td>@obIO.TideDataSet[3].TideHeight</td>
+                                            <td>@obIO.TideDataSet[3].TideType</td>
+                                        </tr>
+                                    </tbody>
+
+                                </table>
+                                <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#@finalString" aria-expanded="false" aria-controls="@finalString">
+                                    Advanced Details
+                                </button>
+
+                            }
+                        }
+                    }
+                    <hr style="margin-top: 1.5rem;" />
+                }
+            }
+
+        </div>
+
+    </div>
+</div>
+
+@code {
+
+    private IndexObjects[] IOHistory;
+    private bool showHistoryCheck = false;
+    private List<String> unqDates = new List<String>();
+    private List<String> unqLocation = new List<String>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await TokenProvider.GetTokenAsync();
+        if (token != null)
+        {
+            Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            IOHistory = await Http.GetJsonAsync<IndexObjects[]>("IndexObjects/Get");
+        }
+    }
+
+    /// <summary>
+    /// Check for showing history and serializing unique dates.
+    /// </summary>
+    private void ShowHistory()
+    {
+        showHistoryCheck = true;
+        uniqueSerializer();
+    }
+
+    /// <summary>
+    /// Stores a list of unique Dates from the user history in order to display user history with better formatting.
+    /// </summary>
+    private void uniqueSerializer()
+    {
+        foreach (var obj in IOHistory)
+        {
+            if (!(unqDates.Contains(obj.Date.ToString("dd/MM/yyyy"))))
+            {
+                unqDates.Add(obj.Date.ToString("dd/MM/yyyy"));
+            }
+            if (!(unqLocation.Contains(obj.Location)))
+            {
+                unqLocation.Add(obj.Location);
+            }
+        }
+    }
+
+
+}

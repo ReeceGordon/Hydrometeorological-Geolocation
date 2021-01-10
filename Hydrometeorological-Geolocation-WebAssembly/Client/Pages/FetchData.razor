@@ -1,46 +1,192 @@
-@page "/fetchdata"
-@using Hydrometeorological_Geolocation_WebAssembly.Shared
+﻿@page "/forecast"
+@using Hydrometeorological_Geolocation_Prototype_V2.Shared
+@using System.Net.Http.Headers;
+@using Hydrometeorological_Geolocation_Prototype_V2.Client.AuthenticationStateProviders
 @inject HttpClient Http
+@inject TokenAuthenticationStateProvider TokenProvider
+@attribute [Authorize]
 
-<h1>Weather forecast</h1>
+@using System;
+@using System.Text;
+@using System.Net.Http;
+@using System.Web;
 
-<p>This component demonstrates fetching data from the server.</p>
+<div class="container">
+    <div class="row">
+        <div class="col-xs-12 col-sm-12">
+            <h1 class="display-1">Future Forecasts</h1>
+            <p class="lead">
+                Maximum forecast for Tidal data is already presented in the current forecast (Home page) via worldweatheronlineAPI which does not have the capability of retrieving marine data in a future forecast on a free/trial API Key.
+                Since no further Marine data can be parsed for the future from this, the following Marine data is gathered from admiraltyAPI Tide data.
+                <span style="color: red">Note this utilises CORS Anywhere which means if it fails then you may get a FETCH/GET  error on this page. Browsing to <a target="_blank" href="https://cors-anywhere.herokuapp.com/">https://cors-anywhere.herokuapp.com/</a> to load the script on the herokuapp server should resolve the issue since herokuapp idles when no visitors are present. Reload this page To try again after doing this.</span>
+            </p>
 
-@if (forecasts == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Temp. (C)</th>
-                <th>Temp. (F)</th>
-                <th>Summary</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var forecast in forecasts)
+            @if (click1B)
             {
-                <tr>
-                    <td>@forecast.Date.ToShortDateString()</td>
-                    <td>@forecast.TemperatureC</td>
-                    <td>@forecast.TemperatureF</td>
-                    <td>@forecast.Summary</td>
-                </tr>
+                <h5>Select Marine Data Node Location</h5>
+                <div class="input-group mb-3">
+                    <div class="input-group-prepend">
+                        <label class="input-group-text" for="inputGroupSelect01">Options</label>
+                    </div>
+                    <select class="custom-select" id="inputGroupSelect01" @bind="selectedValue">
+                        <option selected>Choose...</option>
+                        @foreach (var obj in cityHolder)
+                        {
+                            <option value="@obj">@obj</option>
+                        }
+                    </select>
+                </div>
+                <h5>Select Forecast Days Amount</h5>
+                <div class="input-group mb-3">
+                    <div class="input-group-prepend">
+                        <label class="input-group-text" for="inputGroupSelect01">Options</label>
+                    </div>
+                    <select class="custom-select" id="inputGroupSelect01" @bind="selectedValue2">
+                        <option selected>Choose...</option>
+                        @for (int i = 0; i < 7; i++)
+                        {
+                            <option value="@(i+1)">@(i + 1)</option>
+                        }
+                    </select>
+                </div>
+
+                <button class="btn btn-success" @onclick="MakeRequest">Grab Forecast</button>
+                <hr />
+                @if (makeRClicked)
+                {
+                    <div class="card-columns" style="column-count: 3;">
+
+                        @foreach (var obj in tideList)
+                        {
+                            <div class="card">
+                                <div class="card-block">
+                                    <h5 class="card-header">Tide Data @obj.Date.Split(' ')[0]</h5>
+                                    <div class="card-body">
+                                        <p style="margin-bottom:0;" class="lead card-text">Tide Time: @obj.Date.Split(' ')[1]</p>
+                                        <p style="margin-bottom:0;" class="lead card-text">Tide Height(m): @obj.Height</p>
+                                        <p style="margin-bottom:0;" class="lead card-text">Tide Type: @obj.EventType</p>
+                                    </div>
+                                </div>
+                            </div>
+
+
+
+
+                        }
+
+                    </div>
+                }
+
             }
-        </tbody>
-    </table>
-}
+        </div>
+    </div>
+</div>
 
 @code {
-    private WeatherForecast[] forecasts;
 
-    protected override async Task OnInitializedAsync()
+    String selectedValue;
+    String selectedValue2;
+    private List<TideForecasts> tideList;
+    CultureInfo inputCulture = CultureInfo.CreateSpecificCulture("en-GB");
+
+    /// <summary>
+    /// List of all available Cities as parameters for API alongside their respective IDs found in idHolder
+    /// These were initally grabbed by using a GET request to grab all statin name and IDs and a for loop instantioned the following
+    /// lists. Then the data was grabbed from runstime and stored as static data for much faster loading speeds.
+    /// -Cons
+    /// A manual update for changed names and ids is necesasry if API data changes.
+    /// </summary>
+    private static List<String> cityHolder = new List<String> {
+
+            "Rockall", "ST. MARY'S", "STORNOWAY", "Little Bernera", "Carloway", "Flannan Isles", "FRASERBURGH", "PETERHEAD", "ABERDEEN", "North Sunderland (Northumberland)", "Holy Island", "Berwick", "Eyemouth", "Hirta (Bagh A' Bhaile)", "Londonderry", "Culmore Point", "WARRENPOINT", "Newry (Victoria Lock)", "Kilkeel", "Red Bay", "Cushendun", "Ballycastle Bay", "Portrush", "Coleraine", "RIVER FOYLE (LISAHALLY)", "Hammersmith Bridge", "Kew Bridge", "Richmond Lock", "Loch Inver", "Loch Nedd", "Badcall Bay", "Loch Laxford", "Kinlochbervie", "Rona", "Kyle Of Durness", "Portnancon", "Sule Skerry", "Ramsey Sound", "Porthgain", "Solva", "Little Haven", "Martin's Haven", "Skomer Island", "Dale Roads", "MILFORD HAVEN", "CARDIFF", "Steep Holm", "Flat Holm", "Barry", "Porthcawl", "PORT TALBOT", "River Neath Entrance", "SWANSEA", "Mumbles", "Garlieston", "Isle Of Whithorn", "Port William", "Luce Bay (Offshore Platform)", "Drummore", "Girvan", "Kirkcudbright Bay", "Formby", "Hilbre Island", "MOSTYN DOCKS", "Colwyn Bay", "Llandudno", "Conwy", "Ulverston", "Arnside", "Morecambe", "Heysham", "Glasson Dock", "Lancaster", "Brighton Marina", "NEWHAVEN", "Eastbourne", "Sovereign Harbour", "Hastings", "Rye (Approaches)", "Rye (Harbour)", "DOVER", "Dungeness", "Folkestone", "Deal", "Whitby", "Scarborough", "Filey Bay", "Bridlington", "Wells", "Wells Bar", "Blakeney", "Blakeney Bar", "Cromer", "Winterton-On-Sea", "Caister-On-Sea", "Fortrose", "Inverness", "Cromarty", "INVERGORDON", "Dingwall (Cromarty Firth)", "Meikle Ferry", "Portmahomack", "WHITENESS HEAD", "Nairn", "Burghead", "Lossiemouth", "Golspie", "Buckie", "Whitehills", "Banff", "Stonehaven", "WICK", "Helmsdale", "Stromness", "Stroma", "Gills Bay", "SCRABSTER", "Cullivoe", "Baltasound Pier", "Mid Yell", "Burra Voe (Yell Sound)", "Out Skerries", "LERWICK", "Burra Firth", "Orsay", "Rubh' A' Mhail", "Ardnave Point", "Bruichladdich", "Port Ellen", "Port Askaig", "Loch Eatharna", "Gott Bay", "Iona", "Bunessan", "Sound Of Ulva", "Tobermory", "Scalasaig", "Barra Head", "Barra (North Bay)", "Loch Skipport", "Loch Carnan", "Loch Boisdale", "Castlebay", "Balivanich", "Lochmaddy", "Bays Loch", "Leverburgh", "Shillay", "Scolpaig", "Loch Scresort", "Camus Nan Gall", "Loch Harport", "Bay Of Laig", "Galmisdale Pier", "Loch Dunvegan", "Loch Snizort (Uig Bay)", "Portree", "West Loch Tarbert", "East Loch Tarbert, Outer Hebrides", "Loch Shell", "Aberdovey", "Aberystwyth", "New Quay", "Aberporth", "Port Cardigan", "Cardigan (Town)", "FISHGUARD", "Teignmouth (New Quay)", "Teignmouth (Approaches)", "TORQUAY", "Totnes", "Stoke Gabriel (Duncannon)", "Greenway Quay", "DARTMOUTH", "Start Point", "Salcombe", "PORTLAND", "Chesil Cove", "Bridgwater", "Burnham-On-Sea", "Mupe Bay", "Lulworth Cove", "Chesil Beach", "Bridport (West Bay)", "Lyme Regis", "Moelfre", "Amlwch", "Cemaes Bay", "Southend (Kintyre)", "STRANRAER", "Portpatrick", "Carrickfergus", "LARNE", "EASTHAM", "Hale Head", "Chester", "Connah's Quay", "Duddon Bar", "Whitehaven", "Workington", "Tarn Point", "BARROW (RAMSDEN DOCK)", "Roa Island", "Haws Point", "Halfway Shoal", "Maryport", "Silloth", "Redkirk", "Torduff Point", "Annan Waterfoot", "Southerness Point", "Hestan Island", "RIVER TEES ENTRANCE", "Middlesbrough (Dock Entrance)", "Tees (Newport) Bridge", "BLYTH", "Newcastle-Upon-Tyne", "RIVER TYNE (NORTH SHIELDS)", "SUNDERLAND", "Hartlepool", "Seaham", "Coquet Island", "Amble", "SPURN HEAD", "Bull Sand Fort", "Sunk Dredged Channel", "GRIMSBY", "Faslane", "Arrochar", "Lochgoilhead", "COULPORT", "Loch Leven Head", "Garelochhead", "Loch A' Bhraige", "Applecross", "Shieldaig", "Gairloch", "Mellon Charles", "ULLAPOOL", "Tanera Mor", "Nato Jetty", "GRANGEMOUTH", "ROSYTH", "LEITH", "Granton", "Newburgh", "Burntisland", "Alloa", "Kincardine", "Stirling", "Kirkcaldy", "Perth", "Dunbar", "Cockenzie", "MONTROSE", "Arbroath", "DUNDEE", "River Tay Bar", "Anstruther Easter", "Methil", "Fidra", "Duncansby Head", "Muckle Skerry", "Bur Wick", "Sumburgh (Grutness Voe)", "Fair Isle", "Bay Of Quendale", "Foula", "Scalloway", "West Burra Firth", "Hillswick", "Esha Ness (Hamna Voe)", "SULLOM VOE", "Dury Voe", "Toft Pier", "PENZANCE (NEWLYN)", "Cape Cornwall", "Sennen Cove", "St. Ives", "Truro", "FALMOUTH", "Helford River (Entrance)", "Coverack", "Lizard Point", "Porthleven", "NEWQUAY", "Perranporth", "FOWEY", "Mevagissey", "Par", "Lostwithiel", "Padstow", "Wadebridge", "Cotehele Quay", "PLYMOUTH (DEVONPORT)", "Looe", "Whitsand Bay", "Saltash", "Cargreen", "Lopwell", "Jupiter Point", "St. Germans", "Turnchapel", "Bovisand Pier", "River Yealm Entrance", "Bude", "Lundy", "Boscastle", "Port Isaac", "Clovelly", "Bideford", "Barnstaple", "Fremington", "Yelland Marsh", "Appledore", "Ilfracombe", "Tenby", "Stackpole Quay", "Haverfordwest", "Neyland", "Black Tar", "Llanelli", "Burry Port", "Carmarthen", "Ferryside", "Porlock Bay", "Lynmouth", "Minehead", "Watchet", "Hinkley Point", "Topsham", "Turf Lock", "Starcross", "Exmouth (Approaches)", "Exmouth Dock", "NEWPORT", "Chepstow", "Sudbrook", "Beachley (Aust)", "Inward Rocks", "Narlwood Rocks", "PORT OF BRISTOL (AVONMOUTH)", "Shirehampton", "Sea Mills", "Cumberland Basin Entrance", "Portishead", "Clevedon", "St. Thomas's Head", "English And Welsh Grounds", "Weston-Super-Mare", "Wellhouse Rock", "White House", "Berkeley", "Sharpness Dock", "Epney", "Minsterworth", "Llanthony", "Trearddur Bay", "HOLYHEAD", "Porth Dinllaen", "Porth Ysgaden", "Bardsey Island", "Aberdaron", "Porth Trecastell", "Trwyn Dinmor", "Fort Belan", "Caernarfon", "Port Dinorwic", "Menai Bridge", "Beaumaris", "Llanddwyn Island", "Trefor", "St. Tudwal's Roads", "Pwllheli", "Criccieth", "Porthmadog", "Barmouth", "Killyleagh", "Newcastle (N.Ireland)", "Killough Harbour", "Ardglass", "Killard Point", "Strangford", "Quoile Barrier", "Donaghadee", "Bangor", "BELFAST", "Portavogie", "South Rock", "Widnes", "Garston", "Seacombe (Alfred Dock)", "LIVERPOOL (GLADSTONE DOCK)", "Southport", "Preston", "Blackpool", "Fleetwood", "Wyre Lighthouse", "Fiddler's Ferry", "Christchurch (Tuckton)", "Swanage", "Poole (Entrance)", "POOLE HARBOUR", "Pottery Pier", "Wareham (River Frome)", "Cleavel Point", "Bournemouth", "Christchurch (Entrance)", "Christchurch (Quay)", "Stansore Point", "LYMINGTON", "Hurst Point", "Bucklers Hard", "Yarmouth", "Totland Bay", "Freshwater Bay", "Ventnor", "Sandown", "Ryde", "COWES", "Folly Inn", "Newport (Isle Of Wight)", "Calshot Castle", "SOUTHAMPTON", "Redbridge", "WARSASH", "Bursledon", "Lee-On-The-Solent", "Itchenor", "Foreland (Lifeboat Slip)", "Bembridge Approaches", "Bembridge Harbour", "PORTSMOUTH", "PORTSMOUTH (HIGH WATER STAND)", "Langstone Harbour", "CHICHESTER HARBOUR (ENTRANCE)", "Northney", "Bosham", "Dell Quay", "Selsey Bill", "Nab Tower", "Pagham", "Bognor Regis", "Littlehampton", "Arundel", "Worthing", "SHOREHAM", "Erith", "NORTH WOOLWICH", "LONDON BRIDGE (TOWER PIER)", "Chelsea Bridge", "Albert Bridge", "New Hythe", "SHEERNESS", "Grovehurst Jetty", "Bee Ness", "Bartlett Creek", "Darnett Ness", "Chatham (Lock Approaches)", "Upnor", "Rochester (Strood Pier)", "Wouldham", "Allington Lock", "Southend-On-Sea", "CORYTON", "TILBURY", "Gravesend", "Rochford", "North Fambridge", "Hullbridge", "Battlesbridge", "Osea Island", "Maldon", "Whitaker Beacon", "Faversham", "Whitstable Approaches", "Herne Bay", "Shivering Sand", "Holliwell Point", "BURNHAM-ON-CROUCH", "Bradwell Waterside", "West Mersea", "Brightlingsea", "Colchester", "Clacton-On-Sea", "Bramble Creek", "Mistley", "MARGATE", "Broadstairs", "RAMSGATE", "Richborough", "S.E. Long Sand", "WALTON-ON-THE-NAZE", "Sunk Head", "HARWICH", "FELIXSTOWE PIER", "Ipswich", "Orford Ness", "Iken Cliffs", "Slaughden Quay", "Orford Quay", "Orford Haven Bar", "Bawdsey", "Woodbridge", "Woodbridge Haven", "Aldeburgh", "Minsmere Sluice", "Southwold", "LOWESTOFT", "GREAT YARMOUTH (GORLESTON-ON-SEA)", "Great Yarmouth (Britannia Pier)", "Blacktoft", "Keadby", "Burton Stather", "FLIXBOROUGH WHARF", "Owston Ferry", "GOOLE", "HUMBER SEA TERMINAL", "IMMINGHAM", "HULL (KING GEORGE DOCK)", "Hull (Alexandra Dock)", "HULL (ALBERT DOCK)", "Humber Bridge", "Brough", "Tabs Head", "Outer Westmark Knock", "Wisbech Cut", "Port Sutton Bridge", "Wisbech", "Lawyer's Creek", "BOSTON", "King's Lynn", "Hunstanton", "Burnham (Overy Staithe)", "West Stones", "Skegness", "Inner Dowsing Light", "CAMPBELTOWN", "Machrihanish", "Sound Of Gigha", "Carsaig Bay", "Craighouse", "Rubha A' Bhodaich", "East Loch Tarbert, Loch Fyne", "Loch Ranza", "Carradale", "Tighnabruaich", "Rothesay Bay", "Brodick Bay", "Lamlash", "Craignure", "Loch Aline", "Salen (Sound Of Mull)", "Salen", "Carsaig Bay (Mull)", "Seil Sound", "Glengarrisdale Bay", "Loch Beag", "Dunstaffnage Bay", "Barcaldine Pier", "Port Appin", "Corran", "Loch Creran Head", "Connel", "Ardchattan Point", "Bonawe", "Rubha Na Creige", "OBAN", "Loch Melfort", "Inveraray", "Port Glasgow", "GREENOCK", "Helensburgh", "MILLPORT", "Wemyss Bay", "Rosneath", "Rhu Marina", "Ardrossan", "Irvine", "Troon", "Ayr", "Clydebank (Rothesay Dock)", "Bowling", "GLASGOW", "Loch Moidart", "Mallaig", "Inverie Bay", "Loch Hourn", "Glenelg Bay", "Dornie Bridge", "Kyle Of Lochalsh", "Broadford Bay", "Plockton", "Corpach", "Loch Eil Head", "Pierowall", "Kettletoft Pier", "Whitehall", "Egilsay", "KIRKWALL", "Deer Sound", "Burray Ness", "Loth", "Rapness", "Tingwall", "ST. MARY'S (SCAPA FLOW)", "Widewall Bay",
+
+        };
+    private static List<String> idHolder = new List<String>
+{
+            "0324", "0001", "0308", "0321", "0321A", "0323", "0246", "0245", "0244", "0207", "0208", "0209", "0221", "0322", "0659", "0657", "0628", "0628A", "0629", "0643", "0644", "0651", "0652", "0653", "0658", "0115", "0115A", "0116", "0332", "0330", "0329", "0328", "0327", "0304", "0301", "0300", "0299", "0492", "0491", "0492A", "0492B", "0493", "0494", "0495", "0496", "0514", "0513B", "0513A", "0513", "0512", "0510", "0509A", "0509", "0508", "0422", "0421", "0420A", "0420", "0419", "0414", "0422A", "0448", "0461", "0464", "0470", "0471", "0471A", "0440", "0440A", "0440B", "0441", "0442", "0442A", "0082", "0083", "0084", "0084A", "0085", "0086", "0086A", "0089", "0087", "0088", "0098", "0184", "0183", "0182", "0181", "0157A", "0157", "0155A", "0155", "0154", "0144", "0143", "0255", "0256", "0258", "0259", "0260", "0262", "0261", "0254", "0253", "0250", "0249", "0264", "0248", "0247A", "0247", "0243", "0267", "0265", "0280", "0297", "0297A", "0298", "0292", "0290B", "0290A", "0290", "0289", "0287", "0291", "0379", "0377", "0378", "0380", "0381", "0382", "0356", "0357", "0360", "0361", "0362", "0364", "0374", "0316", "0314", "0312", "0311A", "0313", "0314A", "0318", "0311", "0310B", "0310A", "0317", "0318A", "0353B", "0346", "0345", "0354", "0354A", "0344", "0343", "0342", "0320", "0310", "0309", "0486", "0487", "0488", "0488A", "0489", "0489A", "0490", "0026A", "0026", "0025", "0023C", "0023B", "0023A", "0023", "0021", "0020", "0033", "0031", "0529", "0528", "0034A", "0034", "0030", "0029", "0028", "0476A", "0477", "0477A", "0391", "0414A", "0415", "0639", "0641", "0453", "0455", "0462", "0463", "0437", "0435", "0434", "0436", "0439", "0439A", "0439B", "0439C", "0433", "0432", "0431", "0430", "0426", "0425", "0424", "0185", "0186", "0187", "0204", "0203", "0202", "0190", "0188", "0189", "0205", "0206", "0171", "0171A", "0171B", "0172", "0402B", "0401", "0399C", "0399B", "0369", "0402C", "0340", "0338A", "0338", "0337", "0336", "0334", "0333", "0336A", "0228", "0227", "0225", "0226", "0236A", "0230", "0229A", "0229", "0229B", "0231", "0236B", "0222", "0224", "0242", "0241", "0236", "0235", "0233", "0232", "0223", "0268", "0270", "0282A", "0285A", "0285", "0296", "0296A", "0295", "0294A", "0294", "0293A", "0293", "0288", "0289A", "0002", "0547A", "0548", "0547", "0005A", "0005", "0004A", "0004", "0003", "0002A", "0546", "0546A", "0008", "0007", "0007A", "0008A", "0545", "0545A", "0014C", "0014", "0011", "0012", "0014A", "0014B", "0014D", "0014E", "0014F", "0015", "0015A", "0017", "0543", "0542", "0544", "0544A", "0541", "0540", "0539", "0538", "0537", "0536", "0535", "0502", "0501", "0499", "0497", "0498", "0505A", "0505", "0504A", "0504", "0533", "0534", "0532", "0531", "0530", "0027C", "0027B", "0027A", "0026B", "0027", "0515", "0516", "0517", "0518", "0519", "0520", "0523", "0523A", "0523B", "0524", "0524A", "0525", "0525A", "0526", "0527", "0522B", "0521", "0522", "0522A", "0522C", "0522D", "0522E", "0479", "0478", "0481", "0481A", "0482", "0482A", "0479A", "0476", "0475A", "0475", "0474", "0473", "0472", "0480", "0480A", "0482B", "0483", "0483A", "0484", "0485", "0634", "0630", "0630A", "0631", "0632", "0633", "0633A", "0637", "0637A", "0638", "0636", "0635", "0456", "0452A", "0452", "0451", "0447", "0446", "0445", "0444", "0443", "0456A", "0038B", "0035", "0036", "0036A", "0036B", "0036C", "0036D", "0037", "0038", "0038A", "0043", "0040", "0039", "0042", "0045", "0046", "0048", "0051", "0053", "0058", "0060", "0060A", "0060B", "0061", "0062", "0063", "0063A", "0063B", "0064", "0068C", "0053A", "0053B", "0054", "0065", "0065A", "0066", "0068", "0068A", "0068B", "0068D", "0069", "0070", "0072", "0073", "0074", "0074B", "0075", "0081", "0111B", "0112", "0113", "0113A", "0114", "0109D", "0108", "0106", "0108A", "0108B", "0108C", "0109", "0109A", "0109B", "0109C", "0109E", "0110", "0110A", "0111", "0111A", "0121B", "0122A", "0122B", "0122C", "0123A", "0123B", "0121", "0107", "0105", "0104", "0116A", "0121A", "0122", "0123", "0124", "0126", "0127", "0128", "0129A", "0132", "0103", "0102A", "0102", "0099", "0117", "0129", "0130", "0131", "0133A", "0133", "0137", "0136C", "0136B", "0136A", "0136", "0135", "0134A", "0134", "0139", "0139A", "0140", "0141", "0142", "0142A", "0179", "0178", "0177", "0177A", "0178A", "0180", "0172A", "0173", "0174", "0174A", "0175", "0176", "0176A", "0165", "0163", "0163A", "0164", "0164A", "0164B", "0166", "0162", "0161", "0158", "0161A", "0167", "0168", "0393", "0390", "0389", "0387", "0383", "0396", "0394", "0393B", "0393A", "0396A", "0399", "0408", "0409", "0365A", "0365", "0364A", "0363", "0359", "0373", "0375", "0384", "0371", "0370A", "0370", "0367", "0370B", "0371A", "0371B", "0371C", "0371D", "0372", "0383A", "0395", "0405", "0404", "0403", "0398", "0399A", "0402", "0402A", "0410", "0411", "0412", "0413", "0406A", "0406", "0407", "0355", "0353A", "0353", "0352", "0351", "0349A", "0349", "0341", "0339", "0368", "0368A", "0277", "0275", "0273B", "0273A", "0273", "0272", "0271", "0274", "0276", "0279", "0281", "0282",
+
+        };
+
+    private static bool click1B = false;
+
+
+    //Simple function to debug selected data
+    public void showSelected()
     {
-        forecasts = await Http.GetFromJsonAsync<WeatherForecast[]>("WeatherForecast");
+        Console.WriteLine(selectedValue);
+        //Get ID
+        Console.WriteLine("Value: " + selectedValue);
+
+        Console.WriteLine("ID   : " + idHolder[cityHolder.IndexOf(selectedValue)]);
     }
 
+    /// <summary>
+    /// The token refers to the user credential token, if the token does not equal null then a success login has occured, microsoft 
+    /// identity makes this possible to accomplish without any further checking necessary.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await TokenProvider.GetTokenAsync();
+        if (token != null)
+        {
+            Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            Console.WriteLine("Login Successful?");
+            click1B = true;
+        }
+        
+        //await MakeRequest();
+    }
+
+    bool makeRClicked = false;
+    /// <summary>
+    /// MakeRequest is called when the respective button bound to it is pressed during runtime. It add respective headers for API question to a new
+    /// HttpClient before attempting to get the data asyncronously from the API to store in a String. The String is then parsed as a JObject and ready
+    /// to be cast on to a C# object relvative to the JObject properties and utilised in app.
+    /// </summary>
+    public async Task MakeRequest()
+    {
+        makeRClicked = false;
+        var client = new HttpClient();
+        var queryString = HttpUtility.ParseQueryString(string.Empty);
+
+        // Request headers
+        client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", "01149900423843e084c93509fe9c0606");
+
+        //Get ID
+        Console.WriteLine("Value: " + selectedValue);
+
+        String id = idHolder[cityHolder.IndexOf(selectedValue)];
+
+        Console.WriteLine("ID = " + id);
+        Console.WriteLine("Duration = " + selectedValue2);
+        // Request parameters
+
+        //https://cors-anywhere.herokuapp.com/ allows us to bypass the CORS check, since the remote API doesn't have cors enabled it can't
+        //be accessed unless by its local server. CORS  anywhere allows us to get past this but slightly slows down load time. Likely due to
+        // it being hosted on herokuapp, if I were to fork it and put it on a better server it may return faster. herokuapp idles when no visitors
+        // are present.
+        var uri = $"https://cors-anywhere.herokuapp.com/https://admiraltyapi.azure-api.net/uktidalapi/api/V1/Stations/{id}/TidalEvents?duration={selectedValue2}";
+
+        var response = await client.GetAsync(uri);
+
+        String jsonSTR = await client.GetStringAsync(uri);
+        JArray jArr = JArray.Parse(jsonSTR);
+
+
+        tideList = new List<TideForecasts>();
+        for (int i = 0; i < jArr.Count(); i++)
+        {
+            Console.WriteLine("DateTimeJSON = " + jArr[i]["DateTime"].ToString());
+            tideList.Add(new TideForecasts
+            {
+                Date = jArr[i]["DateTime"].ToString(),
+                EventType = jArr[i]["EventType"].ToString(),
+                Height = jArr[i]["Height"].ToString()
+            });
+            Console.WriteLine("DateTimeLIST = " + tideList[i].Date);
+        };
+        Console.WriteLine("Jarray SIze  = " + jArr.Count());
+        Console.WriteLine("List size  = " + tideList.Count());
+        makeRClicked = true;
+    }
 }

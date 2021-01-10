@@ -1,12 +1,13 @@
-﻿using Hydrometeorological_Geolocation_WebAssembly.Shared;
+﻿using Hydrometeorological_Geolocation_Prototype_V2.Shared;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using System.Data.SqlClient;
 
-namespace Hydrometeorological_Geolocation_WebAssembly.Server.Controllers
+namespace Hydrometeorological_Geolocation_Prototype_V2.Server.Controllers
 {
     [ApiController]
     [Route("[controller]")]
@@ -25,6 +26,7 @@ namespace Hydrometeorological_Geolocation_WebAssembly.Server.Controllers
         }
 
         [HttpGet]
+        [Route("basic")]
         public IEnumerable<WeatherForecast> Get()
         {
             var rng = new Random();
@@ -36,5 +38,18 @@ namespace Hydrometeorological_Geolocation_WebAssembly.Server.Controllers
             })
             .ToArray();
         }
+
+        [HttpGet]
+        [Route("basic2")]
+        public IEnumerable<IndexObjects> Getasd()
+        {
+            var rng = new Random();
+            return Enumerable.Range(1, 5).Select(index => new IndexObjects
+            {
+                WeatherDescription = "This is a Test object to show stuff in basic2"
+            })
+            .ToArray();
+        }
+
     }
 }
